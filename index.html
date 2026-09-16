@@ -376,12 +376,16 @@ function genStacks(st0,ids,counts,P){
   }
   return best||last||st0.map(s=>s.slice());
 }
+/* container placement: 4 = one row; 5+ = bowling-pin staggered rows (back rows nest
+   into the notches between front-row containers so nothing is hidden from the camera) */
 function layout(n){
-  const pos=[],gx=3.05,gz=3.6;
-  if(n<=4){for(let i=0;i<n;i++)pos.push(new THREE.Vector3((i-(n-1)/2)*gx,0,0));}
-  else{const c1=(n+1)>>1;
-    for(let i=0;i<n;i++){const back=i<c1,c=back?i:i-c1,rowN=back?c1:n-c1;
-      pos.push(new THREE.Vector3((c-(rowN-1)/2)*gx,0,back?-gz/2:gz/2));}}
+  const gx=3.05,gz=4.2,pos=[];
+  const rows=n<=4?[n]:n===5?[2,3]:n===6?[1,2,3]:[1,2,4];  // back row → front row
+  const rc=rows.length;
+  for(let k=0;k<rc;k++){
+    const r=rows[k],z=(k-(rc-1)/2)*gz;
+    for(let i=0;i<r;i++)pos.push(new THREE.Vector3((i-(r-1)/2)*gx,0,z));
+  }
   return pos;
 }
 
@@ -451,6 +455,8 @@ function newStage(s){
   setHint(BASE_HINT);
   toast('STAGE '+pad(stage),stageLabel(stage));
 }
+/* wider, flatter camera: pulled back (bigger margin) and lower elevation so sight rays
+   over the front row lose less height per row gap → back rows stay selectable */
 function fitCamera(){
   if(!containers.length)return;
   let x0=1e9,x1=-1e9,z0=1e9,z1=-1e9;
@@ -460,9 +466,9 @@ function fitCamera(){
   const spanX=x1-x0,spanZ=z1-z0,cx=(x0+x1)/2,cz=(z0+z1)/2;
   const v=THREE.MathUtils.degToRad(camera.fov);
   const h=2*Math.atan(Math.tan(v/2)*camera.aspect);
-  const G=Math.max((spanX/2)/Math.tan(h/2),(spanZ/2)/Math.tan(v/2),13)*1.25;
+  const G=Math.max((spanX/2)/Math.tan(h/2),(spanZ/2)/Math.tan(v/2),13)*1.32;
   lookPoint.set(cx,4.5,cz);
-  camBase.set(cx,4.5+G*Math.sin(.6),cz+G*Math.cos(.6));
+  camBase.set(cx,4.5+G*Math.sin(.5),cz+G*Math.cos(.5));
   scene.fog.density=.16/G;
 }
 function toast(main,sub){
