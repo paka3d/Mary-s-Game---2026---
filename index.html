@@ -42,8 +42,9 @@ body{
 .stage-num{font-family:'Unbounded';font-weight:900;font-size:clamp(22px,3.4vw,32px);line-height:1;color:#fff;
   text-shadow:0 4px 24px rgba(0,0,0,.55)}
 .stage-of{font-size:11px;color:var(--mut)}
-.time-line{display:flex;gap:20px;justify-content:flex-end;align-items:baseline;margin-top:6px}
+.time-line{display:flex;gap:20px;justify-content:flex-end;align-items:baseline;margin-top:6px;flex-wrap:wrap}
 #timeVal{font-size:clamp(17px,2.4vw,24px);font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.02em}
+#scoreVal{font-size:clamp(15px,2.2vw,20px);font-weight:700;color:var(--gold);font-variant-numeric:tabular-nums}
 #bestVal{font-size:13px;color:var(--mut);font-variant-numeric:tabular-nums}
 
 #toast{position:fixed;top:15%;left:50%;transform:translate(-50%,-14px);opacity:0;z-index:7;pointer-events:none;
@@ -59,6 +60,18 @@ body{
   box-shadow:0 0 12px var(--gold);animation:pulse 1.6s ease-in-out infinite}
 @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.7);opacity:.45}}
 #hintText{font-size:12.5px;line-height:1.45;color:var(--mut);letter-spacing:.02em}
+#hintText.warn{color:#ffd88a}
+
+#floaters{position:fixed;inset:0;pointer-events:none;z-index:7}
+.floater{position:absolute;transform:translate(-50%,-50%);font-family:'Unbounded';font-weight:700;font-size:17px;
+  color:var(--gold);letter-spacing:.06em;text-shadow:0 2px 14px rgba(0,0,0,.9),0 0 24px rgba(246,183,60,.5);
+  animation:flo 1.05s cubic-bezier(.2,.7,.3,1) forwards}
+.floater.big{font-size:30px;color:#ffd88a;text-shadow:0 2px 18px rgba(0,0,0,.9),0 0 44px rgba(246,183,60,.8)}
+@keyframes flo{
+  0%{opacity:0;transform:translate(-50%,-40%) scale(.5)}
+  18%{opacity:1;transform:translate(-50%,-70%) scale(1.15)}
+  100%{opacity:0;transform:translate(-50%,-210%) scale(1)}
+}
 
 #controls{position:fixed;right:18px;bottom:18px;display:flex;gap:10px;z-index:8}
 #controls button{width:46px;height:46px;border-radius:14px;border:1px solid rgba(255,255,255,.16);
@@ -73,7 +86,7 @@ body{
 
 .overlay{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;
   background:radial-gradient(90% 90% at 50% 45%, rgba(9,13,20,.6), rgba(7,10,16,.9));
-  transition:opacity .5s,visibility .5s;overflow:auto;padding:24px}
+  transition:opacity .35s,visibility .35s;overflow:auto;padding:24px}
 .overlay.hidden{opacity:0;visibility:hidden;pointer-events:none}
 #startOv{backdrop-filter:blur(7px) saturate(1.15)}
 .start-box{text-align:center;max-width:680px;margin:auto}
@@ -84,7 +97,7 @@ body{
 .tba-big{display:inline-block;font-family:'Unbounded';font-weight:700;font-size:clamp(11px,1.8vw,14px);
   letter-spacing:.4em;color:var(--gold);border:1px solid rgba(246,183,60,.45);border-radius:999px;
   padding:8px 10px 8px 20px;margin-bottom:30px}
-.rules{display:flex;flex-direction:column;gap:12px;margin:0 auto 34px;max-width:430px}
+.rules{display:flex;flex-direction:column;gap:12px;margin:0 auto 34px;max-width:460px}
 .rule{display:flex;align-items:center;gap:14px;text-align:left;font-size:14px;color:#c3d2e8;line-height:1.4}
 .rule i{flex:0 0 14px;width:14px;height:14px;border-radius:4px;background:var(--c);transform:rotate(14deg);
   box-shadow:0 0 14px var(--c)}
@@ -99,7 +112,7 @@ body{
 .btn.ghost:hover{border-color:var(--gold);color:var(--gold)}
 .panel{text-align:center;padding:38px 48px;background:rgba(13,21,36,.92);border:1px solid rgba(255,255,255,.12);
   border-radius:22px;box-shadow:0 34px 90px rgba(0,0,0,.65);margin:auto;width:min(92vw,460px);
-  transform:scale(.9) translateY(10px);transition:transform .45s cubic-bezier(.2,.9,.3,1.35)}
+  transform:scale(.9) translateY(10px);transition:transform .3s cubic-bezier(.2,.9,.3,1.35)}
 .overlay:not(.hidden) .panel{transform:scale(1) translateY(0)}
 .clear-kicker{font-size:10px;letter-spacing:.5em;color:var(--gold)}
 .clear-title{font-family:'Unbounded';font-weight:900;font-size:clamp(26px,5.5vw,42px);line-height:1.1;margin:14px 0 6px}
@@ -114,6 +127,7 @@ body{
 @media (max-width:600px){
   #hud{padding:10px 14px}
   .credit{display:none}
+  .time-line{gap:14px}
   #hint{max-width:60vw;font-size:11.5px;left:14px;bottom:76px}
   #controls{right:12px;bottom:12px}
   #controls button{width:42px;height:42px;border-radius:12px}
@@ -124,6 +138,7 @@ body{
 <canvas id="c"></canvas>
 <div id="vignette"></div>
 <div id="progress"><i id="prog"></i></div>
+<div id="floaters"></div>
 
 <header id="hud">
   <div class="hud-left">
@@ -135,6 +150,7 @@ body{
     <div class="stage-line"><span class="lbl">STAGE</span><span id="stageNum" class="stage-num">01</span><span class="stage-of">/ 50</span></div>
     <div class="time-line">
       <div><span class="lbl">TIME</span> <span id="timeVal">0:00.0</span></div>
+      <div><span class="lbl">SCORE</span> <span id="scoreVal">0</span></div>
       <div><span class="lbl">BEST</span> <span id="bestVal">—</span></div>
     </div>
   </div>
@@ -166,7 +182,8 @@ body{
     <h1>MARY'S <span class="g">GAME</span></h1>
     <div class="tba-big">- TBA -</div>
     <div class="rules">
-      <div class="rule"><i style="--c:#ff5c6c"></i><span>Tap a glowing top cube. Staked twins lift as one — grab the bottom of a stack of matches to move the whole block.</span></div>
+      <div class="rule"><i style="--c:#ff5c6c"></i><span>Tap the glowing top cube to lift one — or tap the <b>bottom</b> of a matching group to lift the whole block at once.</span></div>
+      <div class="rule"><i style="--c:#f6b73c"></i><span>Land a cube on its own color and it <b>MERGES</b>: 1+1 → 1×1×2 → 1×1×3 → 1×1×4. A full 4-bar is final and rings the bell for a huge score bonus.</span></div>
       <div class="rule"><i style="--c:#38c3ff"></i><span>Tap a glowing base to drop. Every color must end up together in a single container.</span></div>
       <div class="rule"><i style="--c:#3fe08f"></i><span>50 stages, no fail states — undo is free. Chase your best time.</span></div>
     </div>
@@ -189,7 +206,7 @@ body{
     <div class="clear-kicker">ALL 50 STAGES SORTED</div>
     <div class="clear-title">YOU BEAT<br/>MARY'S GAME</div>
     <div class="clear-time" id="finalTime">0:00.0</div>
-    <div class="clear-sub">TOTAL TIME · GAME DESIGN BY PHC 2026</div>
+    <div class="clear-sub" id="finalMeta">TOTAL SCORE 0 · GAME DESIGN BY PHC 2026</div>
     <button id="btnAgain" class="btn">PLAY AGAIN</button>
   </div>
 </div>
@@ -211,7 +228,8 @@ const fmt=s=>{s=Math.max(0,s);const m=Math.floor(s/60),r=s-m*60;return m+':'+(r<
 const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[a[i],a[j]]=[a[j],a[i]];}return a;};
 const show=el=>el.classList.remove('hidden'), hide=el=>el.classList.add('hidden');
 
-const canvas=$('c'),stageEl=$('stageNum'),timeEl=$('timeVal'),bestEl=$('bestVal'),prog=$('prog'),
+const canvas=$('c'),stageEl=$('stageNum'),timeEl=$('timeVal'),bestEl=$('bestVal'),scoreEl=$('scoreVal'),
+floatersEl=$('floaters'),prog=$('prog'),
 hintText=$('hintText'),toastEl=$('toast'),toastMain=$('toastMain'),toastSub=$('toastSub'),
 startOv=$('startOv'),clearOv=$('clearOv'),finalOv=$('finalOv'),
 clearKicker=$('clearKicker'),clearTime=$('clearTime'),clearMeta=$('clearMeta'),
@@ -219,10 +237,12 @@ btnStart=$('btnStart'),btnContinue=$('btnContinue'),btnNext=$('btnNext'),btnAgai
 btnUndo=$('btnUndo'),btnRestart=$('btnRestart'),btnSound=$('btnSound');
 
 /* ================= constants ================= */
-const CAP=9, STAGES=50;
+const CAP=9, STAGES=50, MAXMERGE=4;
+const MERGE_PTS={2:50,3:150,4:500};
 const PAL=[0xff5c6c,0xffb52e,0x3fe08f,0x38c3ff,0xa06bff];
-const BASE_HINT='Tap a glowing cube — staked twins lift as one. Then tap a glowing base to drop.';
-const DROP_HINT='Tap a glowing base to drop the block · tap the cube again to cancel.';
+const BASE_HINT='Tap a top cube to lift it · tap the bottom of a matching group to lift it all · matching cubes merge into 1×1×4 bars.';
+const groupHint=n=>n>1?`LIFTING ${n} CUBES AS ONE BLOCK · tap a glowing base to drop`
+                      :'Tap a glowing base to drop the block · tap the cube again to cancel.';
 const stageLabel=s=>s<=10?'WARM-UP':s<=20?'HEATING UP':s<=32?'CROWDED':s<=42?'PRESSURE':'MARY MODE';
 
 /* ================= three setup ================= */
@@ -272,8 +292,10 @@ dustGeo.setAttribute('position',new THREE.BufferAttribute(dustPos,3));
 scene.add(new THREE.Points(dustGeo,new THREE.PointsMaterial({color:0x8fb2dd,size:.07,transparent:true,
   opacity:.32,blending:THREE.AdditiveBlending,depthWrite:false})));
 
-/* shared geometry */
+/* shared geometry — cube + merged-bar geometries (1..4 high), cached */
 const CUBE_G=new RoundedBoxGeometry(1,1,1,3,.085);
+const CUBEGS={1:CUBE_G};
+const cubeGeo=n=>CUBEGS[n]||(CUBEGS[n]=new RoundedBoxGeometry(1,n,1,3,.085));
 const INNER=1.28,WALLT=.16,WH=9.7,OUTER=INNER+WALLT*2,PX=INNER/2+WALLT/2;
 const FLOOR_G=new THREE.BoxGeometry(OUTER,WALLT,OUTER);
 const WX_G=new THREE.BoxGeometry(WALLT,WH,OUTER);
@@ -287,10 +309,9 @@ const MAT={
   floor:new THREE.MeshStandardMaterial({color:0x141c2a,roughness:.6,metalness:.4}),
   hb:new THREE.MeshBasicMaterial({visible:false}),
 };
-/* base look for the four independent, camera-facing walls */
-const WALL_BASE={color:0x1c2536,roughness:.48,metalness:.5};
+/* opaque near-black, lightly glossy walls (camera-facing side still fades to 0 each frame) */
+const WALL_BASE={color:0x11141c,roughness:.42,metalness:.55};
 const RIM_BASE ={color:0x9a7433,roughness:.28,metalness:.75,emissive:0x4a3510,emissiveIntensity:.5};
-/* each side: outward normal + which wall/rim geometries and where they sit */
 const SIDE_DEFS=[
   {nx: 0,nz: 1,wall:[WZ_G, 0, PX],rim:[RIM_A, 0,  OUTER/2]},
   {nx: 0,nz:-1,wall:[WZ_G, 0,-PX],rim:[RIM_A, 0, -OUTER/2]},
@@ -308,7 +329,7 @@ let containers=[],cubeList=[],hitboxList=[];
 let colorIds=[],colorCounts={};
 let stage=1,state='play',sel=null,history=[];
 let baseTime=0,tStart=0,tRunning=false,hiddenPause=false;
-let stageTime=0,sessionTotal=0,hoverMesh=null,autoT=null,toastT=null;
+let stageTime=0,sessionTotal=0,score=0,hoverMesh=null,autoT=null,toastT=null,hintFlashT=null;
 let bursts=[],waves=[];
 const camBase=new THREE.Vector3(0,14,14),lookPoint=new THREE.Vector3(0,4.5,0);
 const par={x:0,y:0,tx:0,ty:0};
@@ -329,12 +350,38 @@ const sfx={
     g.gain.exponentialRampToValueAtTime(.0001,t0+d);
     o.connect(g).connect(this.master);o.start(t0);o.stop(t0+d+.03);},
   pick(){this.tone(540,.09,'triangle',.2,260);},
+  pickGroup(){this.tone(420,.1,'triangle',.2,300);this.tone(630,.12,'triangle',.14,220,.05);},
   drop(){this.tone(200,.09,'sine',.3,-80);this.tone(96,.14,'sine',.16,0,.01);},
   cancel(){this.tone(420,.07,'sine',.12,-160);},
   bad(){this.tone(130,.16,'sawtooth',.11,-45);},
+  /* merge pop — pitch & body scale up with the resulting bar size; 4 adds a bell chime */
+  merge(n){
+    const f=300+n*130;
+    this.tone(f,.08,'sine',.3,150);
+    this.tone(f*1.5,.1,'triangle',.16,0,.035);
+    if(n>=4){
+      this.tone(1046,.5,'sine',.22,-30,.06);
+      this.tone(1568,.6,'sine',.14,-40,.14);
+      this.tone(2093,.7,'sine',.1,0,.2);
+    }
+  },
   win(){[523,659,784,1047].forEach((f,i)=>this.tone(f,.22,'triangle',.18,0,i*.09));this.tone(1568,.4,'sine',.1,0,.4);}
 };
 btnSound.classList.toggle('muted',!sfx.on);
+
+/* ================= block helpers (1 stack slot = 1..4 merged cubes) ================= */
+function makeBlock(color,n,y){
+  const m=new THREE.Mesh(cubeGeo(n),new THREE.MeshStandardMaterial({color,roughness:.3,metalness:.12,
+    emissive:color,emissiveIntensity:.15}));
+  m.castShadow=m.receiveShadow=true;m.position.set(0,y,0);
+  const b={color,n,mesh:m,ci:-1};
+  m.userData={item:b,phase:Math.random()*6.28,squash:0,glow:.15};
+  return b;
+}
+/* length (in blocks) of the top run of same-colored blocks */
+function runLenBlocks(arr){if(!arr.length)return 0;const c=arr[arr.length-1].color;let n=1;
+  for(let i=arr.length-2;i>=0&&arr[i].color===c;i--)n++;return n;}
+function cubesOf(arr){return arr.reduce((a,b)=>a+b.n,0);}
 
 /* ================= difficulty + solvable generation ================= */
 function stageParams(s){
@@ -343,44 +390,52 @@ function stageParams(s){
   if(s<=32) return{colors:4,boxes:6,min:5,max:6,scramble:24+((s*.7)|0)};
   return      {colors:5,boxes:6,min:4,max:6,scramble:28+((s*.6)|0)};
 }
-function topRunArr(a){if(!a.length)return 0;const c=a[a.length-1];let n=1;
-  for(let i=a.length-2;i>=0&&a[i]===c;i--)n++;return n;}
-function isSolvedArr(st,ids,counts){
-  for(const h of ids){let owner=-1;
-    for(let i=0;i<st.length;i++){if(st[i].includes(h)){if(owner<0)owner=i;else return false;}}
-    if(owner<0||st[owner].length!==counts[h])return false;}
+function solvedArr(st,ids,counts){
+  for(const h of ids){let owner=-1,total=0;
+    for(let i=0;i<st.length;i++){let t=0;for(const b of st[i])if(b.color===h)t+=b.n;
+      if(t>0){if(owner>=0)return false;owner=i;total=t;}}
+    if(owner<0||total!==counts[h])return false;}
   return true;
 }
-/* scramble FROM the solved state using only legal moves → every puzzle is solvable */
+/* scramble FROM the solved state using the player's own legal moves (group grabs + merges)
+   → every puzzle is solvable; generated boards may already contain pre-merged bars */
 function genStacks(st0,ids,counts,P){
   let best=null,bs=-1,last=null;
   for(let a=0;a<90;a++){
-    const st=st0.map(s=>s.slice());
+    const st=st0.map(s=>s.map(b=>({color:b.color,n:b.n})));
     const moves=P.scramble+((Math.random()*8)|0);
     let ok=true;
     for(let m=0;m<moves;m++){
       const ne=[];st.forEach((s,i)=>{if(s.length)ne.push(i);});
       if(!ne.length){ok=false;break;}
       const src=ne[(Math.random()*ne.length)|0];
-      const k=1+((Math.random()*topRunArr(st[src]))|0);
-      const cd=[];st.forEach((s,i)=>{if(i!==src&&s.length+k<=CAP)cd.push(i);});
+      const R=runLenBlocks(st[src]);
+      const kb=1+((Math.random()*R)|0);          // grab 1..R blocks of the top run
+      const bi=st[src].length-kb;
+      const mc=cubesOf(st[src].slice(bi));
+      const cd=[];st.forEach((s,i)=>{if(i!==src&&cubesOf(s)+mc<=CAP)cd.push(i);});
       if(!cd.length){ok=false;break;}
-      st[cd[(Math.random()*cd.length)|0]].push(...st[src].splice(st[src].length-k,k));
+      const dst=cd[(Math.random()*cd.length)|0];
+      const moved=st[src].splice(bi);
+      for(const b of moved){                     // greedy merge with the destination top
+        const top=st[dst][st[dst].length-1];
+        if(top&&top.color===b.color&&top.n+b.n<=MAXMERGE)top.n+=b.n;else st[dst].push(b);
+      }
     }
     last=st;
-    if(!ok||st.some(s=>s.length<3))continue;
-    const mixed=st.filter(s=>new Set(s).size>1).length;
+    if(!ok||st.some(s=>cubesOf(s)<3))continue;
+    const mixed=st.filter(s=>new Set(s.map(b=>b.color)).size>1).length;
     if(mixed<(P.colors<=3?2:3))continue;
-    if(isSolvedArr(st,ids,counts))continue;
+    if(solvedArr(st,ids,counts))continue;
     if(mixed>bs){bs=mixed;best=st;}
   }
-  return best||last||st0.map(s=>s.slice());
+  return best||last;
 }
-/* container placement: 4 = one row; 5+ = bowling-pin staggered rows (back rows nest
-   into the notches between front-row containers so nothing is hidden from the camera) */
+/* container placement: 4 = one row; 5+ = bowling-pin staggered rows (back → front).
+   refineLayout() then slides any container off a line of sight that a closer one blocks. */
 function layout(n){
   const gx=3.05,gz=4.2,pos=[];
-  const rows=n<=4?[n]:n===5?[2,3]:n===6?[1,2,3]:[1,2,4];  // back row → front row
+  const rows=n<=4?[n]:n===5?[2,3]:n===6?[1,2,3]:[1,2,4];
   const rc=rows.length;
   for(let k=0;k<rc;k++){
     const r=rows[k],z=(k-(rc-1)/2)*gz;
@@ -389,18 +444,76 @@ function layout(n){
   return pos;
 }
 
-/* ================= building a stage ================= */
-function makeCube(h,y0){
-  const m=new THREE.Mesh(CUBE_G,new THREE.MeshStandardMaterial({color:h,roughness:.3,metalness:.12,
-    emissive:h,emissiveIntensity:.15}));
-  m.castShadow=m.receiveShadow=true;m.position.set(0,y0,0);return m;
+/* camera that frames a set of container positions (wide + flat so back rows stay readable) */
+function cameraFor(pts){
+  let x0=1e9,x1=-1e9,z0=1e9,z1=-1e9;
+  for(const p of pts){
+    x0=Math.min(x0,p.x-1.3);x1=Math.max(x1,p.x+1.3);
+    z0=Math.min(z0,p.z-1.3);z1=Math.max(z1,p.z+1.3);
+  }
+  const spanX=x1-x0,spanZ=z1-z0,cx=(x0+x1)/2,cz=(z0+z1)/2;
+  const v=THREE.MathUtils.degToRad(camera.fov);
+  const h=2*Math.atan(Math.tan(v/2)*camera.aspect);
+  const G=Math.max((spanX/2)/Math.tan(h/2),(spanZ/2)/Math.tan(v/2),13)*1.32;
+  return{
+    cam:new THREE.Vector3(cx,4.5+G*Math.sin(.5),cz+G*Math.cos(.5)),
+    look:new THREE.Vector3(cx,4.5,cz),G
+  };
 }
-/* shell: opaque floor + 4 independent sides (wall + gold rim each with own fadeable material) */
+function fitCamera(){
+  if(!containers.length)return;
+  const f=cameraFor(containers.map(c=>({x:c.basePos.x,z:c.basePos.z})));
+  lookPoint.copy(f.look);camBase.copy(f.cam);scene.fog.density=.16/f.G;
+}
+
+/* --- sight-line refinement: bottom-cube ray + top ray must both be clear --- */
+const GHOST={hx:1.05,hz:1.05,y0:0.2,y1:10.05},YLOW=0.5,YTOP=9.6,SOFT=1.3;
+function rayHitsGhost(C,tx,ty,tz,A){
+  const dx=tx-C.x,dy=ty-C.y,dz=tz-C.z;
+  let tmin=0,tmax=1e9;
+  const slab=(oc,dc,c0,c1)=>{
+    if(Math.abs(dc)<1e-9){return (oc>=c0&&oc<=c1)?true:'out';}
+    let t1=(c0-oc)/dc,t2=(c1-oc)/dc;
+    if(t1>t2){const q=t1;t1=t2;t2=q;}
+    if(t1>tmin)tmin=t1; if(t2<tmax)tmax=t2;
+    return tmin>tmax?'out':true;
+  };
+  if(slab(C.x,dx,A.x-GHOST.hx,A.x+GHOST.hx)==='out')return false;
+  if(slab(C.z,dz,A.z-GHOST.hz,A.z+GHOST.hz)==='out')return false;
+  if(slab(C.y,dy,GHOST.y0,GHOST.y1)==='out')return false;
+  return tmax>0;
+}
+function refineLayout(pos){
+  const C=cameraFor(pos).cam;
+  const hd=p=>(C.x-p.x)**2+(C.z-p.z)**2;
+  const order=pos.map((p,i)=>i).sort((a,b)=>hd(pos[a])-hd(pos[b]));
+  for(const bi of order){
+    const bz=pos[bi].z,orig=pos[bi].x;
+    const closer=order.filter(i=>i!==bi&&hd(pos[i])<hd(pos[bi])-0.01);
+    let best=orig,bs=1e9;
+    for(let k=0;k<=320;k++){
+      const x=orig-8+k*0.05;
+      let hard=0,soft=0;
+      for(const ai of closer){
+        const A=pos[ai];
+        if(Math.abs(x-A.x)<SOFT)soft++;
+        if(rayHitsGhost(C,x,YLOW,bz,A)||rayHitsGhost(C,x,YTOP,bz,A))hard++;
+      }
+      const sc=hard*100+soft*25+Math.abs(x-orig)*0.02;
+      if(sc<bs){bs=sc;best=x;}
+    }
+    pos[bi].x=best;
+  }
+  return pos;
+}
+
+/* ================= building a stage ================= */
+/* shell: opaque floor + 4 independent sides (camera-facing side fades out each frame) */
 function addShell(g,ct){
   const f=new THREE.Mesh(FLOOR_G,MAT.floor);f.position.y=WALLT/2;f.castShadow=f.receiveShadow=true;g.add(f);
   ct.sides=SIDE_DEFS.map(def=>{
-    const wallMat=new THREE.MeshStandardMaterial(Object.assign({},WALL_BASE,{transparent:true,opacity:1,depthWrite:true}));
-    const rimMat =new THREE.MeshStandardMaterial(Object.assign({},RIM_BASE ,{transparent:true,opacity:1,depthWrite:true}));
+    const wallMat=new THREE.MeshStandardMaterial(Object.assign({},WALL_BASE));
+    const rimMat =new THREE.MeshStandardMaterial(Object.assign({},RIM_BASE ));
     const wall=new THREE.Mesh(def.wall[0],wallMat);
     wall.position.set(def.wall[1],WALLT+WH/2,def.wall[2]);wall.castShadow=wall.receiveShadow=true;g.add(wall);
     const rim=new THREE.Mesh(def.rim[0],rimMat);
@@ -413,7 +526,7 @@ function newStage(s){
   baseTime=0;tRunning=false;stageTime=0;
   clearTimeout(autoT);hide(clearOv);hide(finalOv);
   for(const ct of containers){
-    for(const it of ct.stack)it.mesh.material.dispose();
+    for(const b of ct.stack)b.mesh.material.dispose();
     for(const sd of ct.sides){sd.wallMat.dispose();sd.rimMat.dispose();}
     ct.disc.material.dispose();ct.ring.material.dispose();
     containerRoot.remove(ct.group);
@@ -425,12 +538,13 @@ function newStage(s){
   colorCounts={};const solved=[];
   colorIds.forEach((h,i)=>{
     colorCounts[h]=P.min+((Math.random()*(P.max-P.min+1))|0);
-    for(let n=0;n<colorCounts[h];n++)(solved[i]=solved[i]||[]).push(h);});
+    const a=[];for(let n=0;n<colorCounts[h];n++)a.push({color:h,n:1});
+    solved.push(a);
+  });
   const total=Object.values(colorCounts).reduce((a,b)=>a+b,0);
   let boxes=P.boxes;if(total>=3*(boxes+1)&&Math.random()<.45)boxes++;   // random container count
-  const st0=[];for(let i=0;i<boxes;i++)st0.push((solved[i]||[]).slice());
-  const st=genStacks(st0,colorIds,colorCounts,P);
-  const pos=layout(boxes);
+  const st=genStacks(solved,colorIds,colorCounts,P);
+  const pos=refineLayout(layout(boxes));   // rows → then slide any container off blocked sight-lines
 
   for(let i=0;i<boxes;i++){
     const g=new THREE.Group();g.position.copy(pos[i]);g.scale.setScalar(.001);
@@ -440,11 +554,12 @@ function newStage(s){
     const ring=new THREE.Mesh(RING_G,ringMat());ring.rotation.x=-Math.PI/2;ring.position.y=.19;g.add(ring);
     ct.disc=disc;ct.ring=ring;
     const hb=new THREE.Mesh(HB_G,MAT.hb);hb.position.y=5.9;hb.userData.ci=i;g.add(hb);hitboxList.push(hb);
-    st[i].forEach((h,idx)=>{
-      const m=makeCube(h,.5+idx+2.6+idx*.12+Math.random()*.8);  // drop-in from above
-      const it={color:h,mesh:m,ci:i};
-      m.userData={item:it,phase:Math.random()*6.28,squash:0,glow:.15};
-      g.add(m);ct.stack.push(it);cubeList.push(m);
+    let cum=0;
+    st[i].forEach((sb,idx)=>{
+      const b=makeBlock(sb.color,sb.n,cum+sb.n/2+2.6+idx*.15+Math.random()*.8);  // drop-in from above
+      cum+=sb.n;
+      b.ci=i;
+      g.add(b.mesh);ct.stack.push(b);cubeList.push(b.mesh);
     });
     containerRoot.add(g);containers.push(ct);
   }
@@ -455,28 +570,22 @@ function newStage(s){
   setHint(BASE_HINT);
   toast('STAGE '+pad(stage),stageLabel(stage));
 }
-/* wider, flatter camera: pulled back (bigger margin) and lower elevation so sight rays
-   over the front row lose less height per row gap → back rows stay selectable */
-function fitCamera(){
-  if(!containers.length)return;
-  let x0=1e9,x1=-1e9,z0=1e9,z1=-1e9;
-  for(const ct of containers){const p=ct.basePos;
-    x0=Math.min(x0,p.x-1.3);x1=Math.max(x1,p.x+1.3);
-    z0=Math.min(z0,p.z-1.3);z1=Math.max(z1,p.z+1.3);}
-  const spanX=x1-x0,spanZ=z1-z0,cx=(x0+x1)/2,cz=(z0+z1)/2;
-  const v=THREE.MathUtils.degToRad(camera.fov);
-  const h=2*Math.atan(Math.tan(v/2)*camera.aspect);
-  const G=Math.max((spanX/2)/Math.tan(h/2),(spanZ/2)/Math.tan(v/2),13)*1.32;
-  lookPoint.set(cx,4.5,cz);
-  camBase.set(cx,4.5+G*Math.sin(.5),cz+G*Math.cos(.5));
-  scene.fog.density=.16/G;
-}
 function toast(main,sub){
   toastMain.textContent=main;toastSub.textContent=sub;
   toastEl.classList.add('show');
   clearTimeout(toastT);toastT=setTimeout(()=>toastEl.classList.remove('show'),2100);
 }
-function setHint(t){hintText.textContent=t;}
+function setHint(t){
+  hintText.classList.remove('warn');
+  hintText.textContent=t;
+}
+/* temporary warning in the hint bar; restores the live hint after */
+function flashHint(msg){
+  hintText.classList.add('warn');
+  hintText.textContent=msg;
+  clearTimeout(hintFlashT);
+  hintFlashT=setTimeout(()=>{hintFlashT=null;setHint(sel?groupHint(cubesOf(containers[sel.ci].stack.slice(sel.bi))):BASE_HINT);},1700);
+}
 
 /* ================= timer ================= */
 const cur=()=>tRunning?baseTime+(performance.now()-tStart)/1000:baseTime;
@@ -486,38 +595,67 @@ document.addEventListener('visibilitychange',()=>{
   else if(hiddenPause){tStart=performance.now();tRunning=true;hiddenPause=false;}
 });
 
-/* ================= moves / win ================= */
-function doMove(src,dst,k,quiet){
+/* ================= moves / merges / win ================= */
+function doMove(src,dst,bi){
   const S=containers[src],D=containers[dst];
-  const moved=S.stack.splice(S.stack.length-k,k);
+  const snapS=S.stack.map(b=>({color:b.color,n:b.n}));   // snapshots make undo merge-proof
+  const snapD=D.stack.map(b=>({color:b.color,n:b.n}));
+  const moved=S.stack.splice(bi);                        // bottom → top
   const v=new THREE.Vector3();
-  for(const it of moved){
-    it.mesh.getWorldPosition(v);
-    it.mesh.position.copy(v.sub(D.group.position));
-    S.group.remove(it.mesh);D.group.add(it.mesh);
-    it.ci=dst;it.mesh.userData.squash=1;
-    D.stack.push(it);
+  for(const b of moved){
+    b.ci=dst;
+    const top=D.stack[D.stack.length-1];
+    if(top&&top.color===b.color&&top.n+b.n<=MAXMERGE){   // MERGE into the destination top
+      const oldN=top.n;
+      top.n+=b.n;
+      top.mesh.geometry=cubeGeo(top.n);                  // stretch into a 1×1×n bar
+      top.mesh.userData.squash=1;
+      b.mesh.parent.remove(b.mesh);
+      b.mesh.material.dispose();
+      const totalH=D.stack.reduce((a,x)=>a+x.n,0);
+      mergeFX(D,new THREE.Vector3(D.basePos.x,totalH+.2,D.basePos.z),top.n,oldN);
+    }else{
+      b.mesh.getWorldPosition(v);
+      b.mesh.position.copy(v.sub(D.group.position));
+      S.group.remove(b.mesh);D.group.add(b.mesh);
+      b.mesh.userData.squash=1;
+      D.stack.push(b);
+    }
   }
-  if(!quiet)history.push({src,dst,k});
+  history.push({src,dst,snapS,snapD});
   sel=null;setHint(BASE_HINT);
-  if(!quiet)sfx.drop();
+  sfx.drop();
   checkWin();
 }
 function undoMove(){
   if(state!=='play')return;
   const m=history.pop();
   if(!m){sfx.bad();return;}
-  doMove(m.dst,m.src,m.k,true);
+  restoreStack(containers[m.src],m.snapS);
+  restoreStack(containers[m.dst],m.snapD);
+  cubeList.length=0;
+  for(const ct of containers)for(const b of ct.stack)cubeList.push(b.mesh);
+  sel=null;setHint(BASE_HINT);
   sfx.cancel();
+}
+function restoreStack(ct,snap){
+  for(const b of ct.stack){ct.group.remove(b.mesh);b.mesh.material.dispose();}
+  ct.stack.length=0;
+  let cum=0;
+  for(const s of snap){
+    const b=makeBlock(s.color,s.n,cum+s.n/2);
+    b.ci=ct.index;
+    ct.group.add(b.mesh);ct.stack.push(b);cum+=s.n;
+  }
 }
 function checkWin(){
   for(const h of colorIds){
-    let owner=-1;
+    let owner=null,total=0;
     for(const ct of containers){
-      if(!ct.stack.some(x=>x.color===h))continue;
-      if(owner<0)owner=ct;else return;
+      let t=0;for(const b of ct.stack)if(b.color===h)t+=b.n;
+      if(t>0){if(owner)return;owner=ct;total=t;}
     }
-    if(owner.stack.length!==colorCounts[h])return;  // color must own its whole container
+    if(!owner||total!==colorCounts[h])return;  // color must own its whole container
   }
   onWin();
 }
@@ -531,9 +669,9 @@ function onWin(){
   sel=null;sfx.win();
   for(const ct of containers){
     if(!ct.stack.length)continue;
+    const totalH=ct.stack.reduce((a,b)=>a+b.n,0);
     ct.winGlow=1.6;
-    const topY=Math.min(ct.stack.length,9)+.4;
-    burst(new THREE.Vector3(ct.basePos.x,topY,ct.basePos.z),ct.stack[ct.stack.length-1].color,48);
+    burst(new THREE.Vector3(ct.basePos.x,Math.min(totalH,9)+.4,ct.basePos.z),ct.stack[ct.stack.length-1].color,48);
     wave(ct.basePos);
   }
   burst(new THREE.Vector3(0,6.5,0),0xffd27a,90,4.2,6);
@@ -541,19 +679,21 @@ function onWin(){
   clearTime.textContent=fmt(stageTime);
   clearMeta.innerHTML='BEST '+fmt(bests[stage])+(isNew?' <span class="newbest">NEW BEST!</span>':'');
   btnNext.textContent=stage>=STAGES?'FINISH ✦':'NEXT STAGE →';
-  setTimeout(()=>{if(state==='clear')show(clearOv);},850);
-  autoT=setTimeout(advance,5200);
+  setTimeout(()=>{if(state==='clear')show(clearOv);},520);     // snappy: overlay up fast
+  autoT=setTimeout(advance,4800);
 }
 function advance(){
   clearTimeout(autoT);
   if(state!=='clear')return;
   hide(clearOv);
   stage++;
-  if(stage>STAGES){state='done';$('finalTime').textContent=fmt(sessionTotal);show(finalOv);}
+  if(stage>STAGES){state='done';$('finalTime').textContent=fmt(sessionTotal);
+    $('finalMeta').textContent='TOTAL SCORE '+score.toLocaleString()+' · GAME DESIGN BY PHC 2026';
+    show(finalOv);}
   else newStage(stage);
 }
 
-/* ================= particles ================= */
+/* ================= particles + merge FX ================= */
 function burst(pos,hex,n,spread=3.2,up=4.6){
   const p=new Float32Array(n*3),v=new Float32Array(n*3);
   for(let i=0;i<n;i++){p[i*3]=pos.x;p[i*3+1]=pos.y;p[i*3+2]=pos.z;
@@ -584,8 +724,31 @@ function updParticles(dt){
     if(w.t>1.15){scene.remove(w.m);w.m.geometry.dispose();w.mat.dispose();waves.splice(i,1);continue;}
     w.m.scale.setScalar(1+w.t*9);w.mat.opacity=.8*(1-w.t/1.15);}
 }
+/* merge reward: spark size + score scale with the resulting bar (4 = the big one) */
+function mergeFX(ct,pos,newN,oldN){
+  const col=ct.stack[ct.stack.length-1].color;
+  if(newN===2){ burst(pos,col,12,1.4,2); sfx.merge(2); addScore(MERGE_PTS[2],pos,false); }
+  else if(newN===3){ burst(pos,col,26,2.2,3); burst(pos,col,10,1,4.5); sfx.merge(3); addScore(MERGE_PTS[3],pos,false); }
+  else{ burst(pos,col,55,3,5); burst(pos,0xffd88a,40,3.6,6); wave(ct.basePos); sfx.merge(4); addScore(MERGE_PTS[4],pos,true); }
+}
+function addScore(pts,pos,big){
+  score+=pts;scoreEl.textContent=score.toLocaleString();
+  const v=pos.clone().project(camera);
+  const el=document.createElement('div');
+  el.className='floater'+(big?' big':'');
+  el.textContent='+'+pts;
+  el.style.left=((v.x*.5+.5)*innerWidth)+'px';
+  el.style.top=((-v.y*.5+.5)*innerHeight)+'px';
+  floatersEl.appendChild(el);
+  setTimeout(()=>el.remove(),1100);
+}
 
-/* ================= input ================= */
+/* ================= input =================
+   PICK RULE (blocks): the tap must land on a block inside the container's top matching run.
+   Grabbing takes that block + every block above it — so:
+     · tap a single top cube   → k = 1 cube
+     · tap a 1×1×n merged bar  → the whole bar lifts
+     · tap the bottom block of a run of same-color blocks → they all lift together */
 const ray=new THREE.Raycaster(),pv=new THREE.Vector2();
 function pickAt(cx,cy){
   const r=canvas.getBoundingClientRect();
@@ -603,32 +766,37 @@ canvas.addEventListener('pointerdown',e=>{
   const p=pickAt(e.clientX,e.clientY);
   if(!sel){
     if(p&&p.type==='cube'){
-      const it=p.item,ct=containers[it.ci],L=ct.stack.length,idx=ct.stack.indexOf(it);
-      if(idx>=L-topRunArr(ct.stack)){           // inside the top matching run
-        sel={ci:it.ci,k:L-idx};                 // tapped cube + everything above it moves
-        startClock();sfx.pick();setHint(DROP_HINT);
-      }else{sfx.bad();ct.shake=1;}
+      const b=p.item,ct=containers[b.ci],L=ct.stack.length,idx=ct.stack.indexOf(b);
+      if(idx>=L-runLenBlocks(ct.stack)){           // tapped block is inside the top matching run
+        sel={ci:ct.index,bi:idx};
+        startClock();
+        const n=cubesOf(ct.stack.slice(idx));      // total cubes grabbed
+        if(n>1)sfx.pickGroup();else sfx.pick();
+        setHint(groupHint(n));
+      }else{sfx.bad();ct.shake=1;
+        flashHint('BURIED — clear the cubes stacked above it first!');}
     }
   }else{
     if(p&&p.type==='cube'){
-      const it=p.item;
-      if(it.ci===sel.ci){
-        const ct=containers[sel.ci],L=ct.stack.length,idx=ct.stack.indexOf(it);
-        if(idx>=L-topRunArr(ct.stack)){
-          const nk=L-idx;
-          if(nk===sel.k){sel=null;setHint(BASE_HINT);sfx.cancel();}
-          else{sel.k=nk;sfx.pick();}
+      const b=p.item;
+      if(b.ci===sel.ci){
+        const ct=containers[sel.ci],L=ct.stack.length,idx=ct.stack.indexOf(b);
+        if(idx>=L-runLenBlocks(ct.stack)){
+          if(idx===sel.bi){sel=null;setHint(BASE_HINT);sfx.cancel();}   // same grab again → cancel
+          else{sel.bi=idx;sfx.pick();setHint(groupHint(cubesOf(ct.stack.slice(idx))));}  // retarget grab size
         }else{sel=null;setHint(BASE_HINT);sfx.cancel();}
       }else{
-        const dst=containers[it.ci];
-        if(dst.stack.length+sel.k<=CAP)doMove(sel.ci,it.ci,sel.k);
-        else{sfx.bad();dst.shake=1;dst.badFlash=1;}
+        const dst=containers[b.ci];                // drop onto another container
+        const need=cubesOf(containers[sel.ci].stack.slice(sel.bi));
+        if(cubesOf(dst.stack)+need<=CAP)doMove(sel.ci,b.ci,sel.bi);
+        else{sfx.bad();dst.shake=1;dst.badFlash=1;flashHint('FULL — that base only holds '+CAP+' cubes!');}
       }
     }else if(p&&p.type==='box'){
       if(p.ci!==sel.ci){
         const dst=containers[p.ci];
-        if(dst.stack.length+sel.k<=CAP)doMove(sel.ci,p.ci,sel.k);
-        else{sfx.bad();dst.shake=1;dst.badFlash=1;}
+        const need=cubesOf(containers[sel.ci].stack.slice(sel.bi));
+        if(cubesOf(dst.stack)+need<=CAP)doMove(sel.ci,p.ci,sel.bi);
+        else{sfx.bad();dst.shake=1;dst.badFlash=1;flashHint('FULL — that base only holds '+CAP+' cubes!');}
       }
     }else{sel=null;setHint(BASE_HINT);}
   }
@@ -638,8 +806,8 @@ window.addEventListener('pointermove',e=>{
   if(e.pointerType!=='mouse')return;
   const p=state==='play'?pickAt(e.clientX,e.clientY):null;
   if(p&&p.type==='cube'){
-    const it=p.item,ct=containers[it.ci],L=ct.stack.length,idx=ct.stack.indexOf(it);
-    if(idx>=L-topRunArr(ct.stack)){hoverMesh=it.mesh;canvas.style.cursor='pointer';return;}
+    const b=p.item,ct=containers[b.ci],L=ct.stack.length,idx=ct.stack.indexOf(b);
+    if(idx>=L-runLenBlocks(ct.stack)){hoverMesh=b.mesh;canvas.style.cursor='pointer';return;}
   }
   hoverMesh=null;canvas.style.cursor='default';
 });
@@ -660,7 +828,7 @@ btnStart.addEventListener('click',()=>{
   sfx.init();sfx.resume();sfx.pick();hide(startOv);
   toast('STAGE '+pad(stage),stageLabel(stage));
 });
-btnAgain.addEventListener('click',()=>{sessionTotal=0;newStage(1);state='play';});
+btnAgain.addEventListener('click',()=>{sessionTotal=0;score=0;scoreEl.textContent='0';newStage(1);state='play';});
 const cleared=Math.max(0,...Object.keys(bests).map(Number));
 if(cleared>=1&&cleared<STAGES){
   btnContinue.style.display='inline-block';
@@ -693,12 +861,12 @@ function tick(){
     ct.winGlow*=Math.exp(-dt*1.4);
     ct.group.position.x=ct.basePos.x+Math.sin(t*40)*.14*ct.shake;
 
-    /* dollhouse: fade out any side-wall that stands between the camera and the interior */
+    /* dollhouse: the camera-facing side fades to 0 so the stack inside is visible */
     const tx=camera.position.x-ct.group.position.x,
           tz=camera.position.z-ct.group.position.z;
     for(const s of ct.sides){
-      const facing=s.nx*tx+s.nz*tz;
-      s.op+=((facing>0.15?0:1)-s.op)*Math.min(1,dt*9);
+      const ft=(s.nx*tx+s.nz*tz)>0.15?0:1;
+      s.op+=(ft-s.op)*Math.min(1,dt*9);
       const vis=s.op>0.03;
       s.wall.visible=vis;s.rim.visible=vis;
       if(vis){
@@ -709,9 +877,10 @@ function tick(){
       s.rimMat.emissiveIntensity=rimPulse;
     }
 
-    const L=ct.stack.length,run=topRunArr(ct.stack);
+    const L=ct.stack.length,run=runLenBlocks(ct.stack);
     const isSel=sel&&sel.ci===ct.index;
-    const canDrop=sel&&!isSel&&L+sel.k<=CAP;
+    const needNow=sel?cubesOf(containers[sel.ci].stack.slice(sel.bi)):0;
+    const canDrop=sel&&!isSel&&cubesOf(ct.stack)+needNow<=CAP;
     const ringT=isSel?.5+.28*Math.sin(t*5):Math.max(0,ct.winGlow-1)*.9;
     ct.ring.material.opacity+=(ringT-ct.ring.material.opacity)*Math.min(1,dt*10);
     const flashing=ct.badFlash>.04;
@@ -719,23 +888,26 @@ function tick(){
     ct.disc.material.color.setHex(flashing?0xff5566:0x41d6ff);
     ct.disc.material.opacity+=(dT-ct.disc.material.opacity)*Math.min(1,dt*10);
 
+    /* stack blocks: y positions are cumulative heights (bars occupy n units) */
     const selHere=sel&&sel.ci===ct.index;
+    let cum=0;
     for(let i=0;i<L;i++){
-      const it=ct.stack[i],m=it.mesh,u=m.userData;
-      const inRun=L>0&&i>=L-run;
-      const inSel=selHere&&i>=L-sel.k;
-      let ty=.5+i,sway=0;
-      if(inSel){ty+=.55+Math.sin(t*5+u.phase)*.05;sway=Math.sin(t*3.1+u.phase)*.09;}
+      const b=ct.stack[i],m=b.mesh,u=m.userData,n=b.n;
+      const ty=cum+n/2;cum+=n;
+      const inRun=i>=L-run;                          // in the top matching run (pickable)
+      const inSel=selHere&&i>=sel.bi;                // part of the lifted grab
+      let lift=0,sway=0;
+      if(inSel){lift=.55+Math.sin(t*5)*.05;sway=Math.sin(t*3.4)*.09;}  // whole grab moves in sync
       let glow=inSel?.62:inRun?.26+Math.sin(t*2.6+u.phase)*.1:.1;
       if(m===hoverMesh)glow=Math.max(glow,.72);
       u.glow+=(glow-u.glow)*Math.min(1,dt*9);
       m.material.emissiveIntensity=u.glow;
       m.position.x+=-m.position.x*kk;
-      m.position.y+=(ty-m.position.y)*kk;
+      m.position.y+=(ty+lift-m.position.y)*kk;
       m.position.z+=-m.position.z*kk;
       m.rotation.y+=(sway-m.rotation.y)*Math.min(1,dt*8);
       u.squash*=Math.exp(-dt*7);
-      const s=u.squash*.18;m.scale.set(1+s,1-s,1+s);
+      const s=u.squash*.16;m.scale.set(1+s,(1-s)*n,1+s);   // squash respects the bar's n-height
     }
   }
   updParticles(dt);
