@@ -27,6 +27,9 @@ body{
 #progress{position:fixed;top:0;left:0;right:0;height:3px;background:rgba(255,255,255,.07);z-index:6}
 #prog{display:block;height:100%;width:2%;background:linear-gradient(90deg,var(--gold),#ffd88a);
   box-shadow:0 0 14px rgba(246,183,60,.55);transition:width .7s cubic-bezier(.2,.8,.2,1)}
+#errbar{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);z-index:99;max-width:88vw;
+  background:#3a1220;border:1px solid #ff5c6c;color:#ffd7de;font:13px/1.5 monospace;
+  padding:10px 16px;border-radius:10px;display:none;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.6)}
 
 #hud{position:fixed;top:14px;left:0;right:0;display:flex;justify-content:space-between;align-items:flex-start;
   padding:14px 22px;pointer-events:none;z-index:5}
@@ -137,6 +140,7 @@ body{
 <body>
 <canvas id="c"></canvas>
 <div id="vignette"></div>
+<div id="errbar"></div>
 <div id="progress"><i id="prog"></i></div>
 <div id="floaters"></div>
 
@@ -183,7 +187,7 @@ body{
     <div class="tba-big">- TBA -</div>
     <div class="rules">
       <div class="rule"><i style="--c:#ff5c6c"></i><span>Tap the glowing top cube to lift one — or tap the <b>bottom</b> of a matching group to lift the whole block at once.</span></div>
-      <div class="rule"><i style="--c:#f6b73c"></i><span>Land a cube on its own color and it <b>MERGES</b>: 1+1 → 1×1×2 → 1×1×3 → 1×1×4. A full 4-bar is final and rings the bell for a huge score bonus.</span></div>
+      <div class="rule"><i style="--c:#f6b73c"></i><span>Land a cube on its own color and it <b>MERGES</b>: 1+1 → 1×1×2 → 1×1×3 → 1×1×4. A full 4-bar is final and rings the bell for a huge score bonus. Only your drops create merges.</span></div>
       <div class="rule"><i style="--c:#38c3ff"></i><span>Tap a glowing base to drop. Every color must end up together in a single container.</span></div>
       <div class="rule"><i style="--c:#3fe08f"></i><span>50 stages, no fail states — undo is free. Chase your best time.</span></div>
     </div>
@@ -211,6 +215,14 @@ body{
   </div>
 </div>
 
+<!-- catches even CDN/import failures, before the module runs -->
+<script>
+  window.addEventListener('error',function(e){
+    var b=document.getElementById('errbar');
+    if(b){b.style.display='block';b.textContent='\u26A0 '+(e.message||'script or CDN failed to load')+' — open F12 console for details';}
+  });
+</script>
+
 <script type="importmap">
 {"imports":{
   "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
@@ -235,6 +247,12 @@ startOv=$('startOv'),clearOv=$('clearOv'),finalOv=$('finalOv'),
 clearKicker=$('clearKicker'),clearTime=$('clearTime'),clearMeta=$('clearMeta'),
 btnStart=$('btnStart'),btnContinue=$('btnContinue'),btnNext=$('btnNext'),btnAgain=$('btnAgain'),
 btnUndo=$('btnUndo'),btnRestart=$('btnRestart'),btnSound=$('btnSound');
+
+/* on-screen error trap (runtime) — anything that throws shows here instead of a silent blank */
+const errbar=$('errbar');
+function showErr(msg){if(errbar){errbar.style.display='block';errbar.textContent='\u26A0 '+msg+' — open F12 console for details';}}
+window.addEventListener('error',e=>showErr(e.message||'runtime error'));
+window.addEventListener('unhandledrejection',e=>showErr((e.reason&&e.reason.message)||String(e.reason)));
 
 /* ================= constants ================= */
 const CAP=9, STAGES=50, MAXMERGE=4;
@@ -354,7 +372,7 @@ const sfx={
   drop(){this.tone(200,.09,'sine',.3,-80);this.tone(96,.14,'sine',.16,0,.01);},
   cancel(){this.tone(420,.07,'sine',.12,-160);},
   bad(){this.tone(130,.16,'sawtooth',.11,-45);},
-  /* merge pop — pitch & body scale up with the resulting bar size; 4 adds a bell chime */
+  /* merge pop — pitch & body scale with the resulting bar size; 4 adds a bell chime */
   merge(n){
     const f=300+n*130;
     this.tone(f,.08,'sine',.3,150);
@@ -382,6 +400,11 @@ function makeBlock(color,n,y){
 function runLenBlocks(arr){if(!arr.length)return 0;const c=arr[arr.length-1].color;let n=1;
   for(let i=arr.length-2;i>=0&&arr[i].color===c;i--)n++;return n;}
 function cubesOf(arr){return arr.reduce((a,b)=>a+b.n,0);}
+/* rebuild the raycast list so removed/merged meshes stop being pickable */
+function rebuildCubeList(){
+  cubeList.length=0;
+  for(const ct of containers)for(const b of ct.stack)cubeList.push(b.mesh);
+}
 
 /* ================= difficulty + solvable generation ================= */
 function stageParams(s){
@@ -397,8 +420,10 @@ function solvedArr(st,ids,counts){
     if(owner<0||total!==counts[h])return false;}
   return true;
 }
-/* scramble FROM the solved state using the player's own legal moves (group grabs + merges)
-   → every puzzle is solvable; generated boards may already contain pre-merged bars */
+/* scramble FROM the solved state using legal group-grab moves — but WITHOUT merging:
+   every block is always pushed as-is (n stays 1), so every stage starts as single cubes
+   and only PLAYER drops can create merges. (Scramble still stacks same-color cubes
+   adjacent, which is exactly what enables the group-lift mechanic at the start.) */
 function genStacks(st0,ids,counts,P){
   let best=null,bs=-1,last=null;
   for(let a=0;a<90;a++){
@@ -410,17 +435,14 @@ function genStacks(st0,ids,counts,P){
       if(!ne.length){ok=false;break;}
       const src=ne[(Math.random()*ne.length)|0];
       const R=runLenBlocks(st[src]);
-      const kb=1+((Math.random()*R)|0);          // grab 1..R blocks of the top run
+      const kb=1+((Math.random()*R)|0);          // grab 1..R single blocks of the top run
       const bi=st[src].length-kb;
       const mc=cubesOf(st[src].slice(bi));
       const cd=[];st.forEach((s,i)=>{if(i!==src&&cubesOf(s)+mc<=CAP)cd.push(i);});
       if(!cd.length){ok=false;break;}
       const dst=cd[(Math.random()*cd.length)|0];
       const moved=st[src].splice(bi);
-      for(const b of moved){                     // greedy merge with the destination top
-        const top=st[dst][st[dst].length-1];
-        if(top&&top.color===b.color&&top.n+b.n<=MAXMERGE)top.n+=b.n;else st[dst].push(b);
-      }
+      st[dst].push(...moved);                    // NO merge here — keeps every cube at n=1
     }
     last=st;
     if(!ok||st.some(s=>cubesOf(s)<3))continue;
@@ -543,7 +565,12 @@ function newStage(s){
   });
   const total=Object.values(colorCounts).reduce((a,b)=>a+b,0);
   let boxes=P.boxes;if(total>=3*(boxes+1)&&Math.random()<.45)boxes++;   // random container count
-  const st=genStacks(solved,colorIds,colorCounts,P);
+  /* st0 must have exactly `boxes` entries (one per CONTAINER), not one per color.
+     Extra containers start empty — the scrambler fills them, and the generation filter
+     still requires every container to end with 3+ cubes. */
+  const st0=[];
+  for(let i=0;i<boxes;i++)st0.push(i<solved.length?solved[i].map(b=>({color:b.color,n:b.n})):[]);
+  const st=genStacks(st0,colorIds,colorCounts,P);
   const pos=refineLayout(layout(boxes));   // rows → then slide any container off blocked sight-lines
 
   for(let i=0;i<boxes;i++){
@@ -605,12 +632,12 @@ function doMove(src,dst,bi){
   for(const b of moved){
     b.ci=dst;
     const top=D.stack[D.stack.length-1];
-    if(top&&top.color===b.color&&top.n+b.n<=MAXMERGE){   // MERGE into the destination top
+    if(top&&top.color===b.color&&top.n+b.n<=MAXMERGE){   // MERGE into the destination top (player only)
       const oldN=top.n;
       top.n+=b.n;
       top.mesh.geometry=cubeGeo(top.n);                  // stretch into a 1×1×n bar
       top.mesh.userData.squash=1;
-      b.mesh.parent.remove(b.mesh);
+      if(b.mesh.parent)b.mesh.parent.remove(b.mesh);
       b.mesh.material.dispose();
       const totalH=D.stack.reduce((a,x)=>a+x.n,0);
       mergeFX(D,new THREE.Vector3(D.basePos.x,totalH+.2,D.basePos.z),top.n,oldN);
@@ -622,6 +649,7 @@ function doMove(src,dst,bi){
       D.stack.push(b);
     }
   }
+  rebuildCubeList();                                     // merged meshes leave the raycast list
   history.push({src,dst,snapS,snapD});
   sel=null;setHint(BASE_HINT);
   sfx.drop();
@@ -633,8 +661,7 @@ function undoMove(){
   if(!m){sfx.bad();return;}
   restoreStack(containers[m.src],m.snapS);
   restoreStack(containers[m.dst],m.snapD);
-  cubeList.length=0;
-  for(const ct of containers)for(const b of ct.stack)cubeList.push(b.mesh);
+  rebuildCubeList();
   sel=null;setHint(BASE_HINT);
   sfx.cancel();
 }
@@ -746,7 +773,7 @@ function addScore(pts,pos,big){
 /* ================= input =================
    PICK RULE (blocks): the tap must land on a block inside the container's top matching run.
    Grabbing takes that block + every block above it — so:
-     · tap a single top cube   → k = 1 cube
+     · tap a single top cube   → 1 cube lifts
      · tap a 1×1×n merged bar  → the whole bar lifts
      · tap the bottom block of a run of same-color blocks → they all lift together */
 const ray=new THREE.Raycaster(),pv=new THREE.Vector2();
@@ -842,77 +869,82 @@ const clock=new THREE.Clock();
 const easeOutBack=x=>{const c1=1.70158,c3=c1+1;return 1+c3*Math.pow(x-1,3)+c1*Math.pow(x-1,2);};
 function tick(){
   requestAnimationFrame(tick);
-  const dt=Math.min(clock.getDelta(),.06),t=clock.elapsedTime;
+  try{
+    const dt=Math.min(clock.getDelta(),.06),t=clock.elapsedTime;
 
-  par.x+=(par.tx-par.x)*Math.min(1,dt*3);
-  par.y+=(par.ty-par.y)*Math.min(1,dt*3);
-  camera.position.set(camBase.x+par.x*1.1,camBase.y-par.y*.6,camBase.z);
-  camera.lookAt(lookPoint);
+    par.x+=(par.tx-par.x)*Math.min(1,dt*3);
+    par.y+=(par.ty-par.y)*Math.min(1,dt*3);
+    camera.position.set(camBase.x+par.x*1.1,camBase.y-par.y*.6,camBase.z);
+    camera.lookAt(lookPoint);
 
-  for(let i=0;i<DUST_N;i++){dustPos[i*3+1]+=dustSpd[i]*dt;if(dustPos[i*3+1]>11.4)dustPos[i*3+1]=.3;}
-  dustGeo.attributes.position.needsUpdate=true;
+    for(let i=0;i<DUST_N;i++){dustPos[i*3+1]+=dustSpd[i]*dt;if(dustPos[i*3+1]>11.4)dustPos[i*3+1]=.3;}
+    dustGeo.attributes.position.needsUpdate=true;
 
-  const kk=1-Math.exp(-dt*13),rimPulse=.42+.16*Math.sin(t*.9);
-  for(const ct of containers){
-    ct.spawn=Math.min(1,ct.spawn+dt*2);
-    ct.group.scale.setScalar(Math.max(.001,easeOutBack(ct.spawn)));
-    ct.shake*=Math.exp(-dt*4);
-    ct.badFlash*=Math.exp(-dt*5);
-    ct.winGlow*=Math.exp(-dt*1.4);
-    ct.group.position.x=ct.basePos.x+Math.sin(t*40)*.14*ct.shake;
+    const kk=1-Math.exp(-dt*13),rimPulse=.42+.16*Math.sin(t*.9);
+    for(const ct of containers){
+      ct.spawn=Math.min(1,ct.spawn+dt*2);
+      ct.group.scale.setScalar(Math.max(.001,easeOutBack(ct.spawn)));
+      ct.shake*=Math.exp(-dt*4);
+      ct.badFlash*=Math.exp(-dt*5);
+      ct.winGlow*=Math.exp(-dt*1.4);
+      ct.group.position.x=ct.basePos.x+Math.sin(t*40)*.14*ct.shake;
 
-    /* dollhouse: the camera-facing side fades to 0 so the stack inside is visible */
-    const tx=camera.position.x-ct.group.position.x,
-          tz=camera.position.z-ct.group.position.z;
-    for(const s of ct.sides){
-      const ft=(s.nx*tx+s.nz*tz)>0.15?0:1;
-      s.op+=(ft-s.op)*Math.min(1,dt*9);
-      const vis=s.op>0.03;
-      s.wall.visible=vis;s.rim.visible=vis;
-      if(vis){
-        const dw=s.op>0.6;
-        if(s.wallMat.depthWrite!==dw){s.wallMat.depthWrite=dw;s.rimMat.depthWrite=dw;}
-        s.wallMat.opacity=s.op;s.rimMat.opacity=s.op;
+      /* dollhouse: the camera-facing side fades to 0 so the stack inside is visible */
+      const tx=camera.position.x-ct.group.position.x,
+            tz=camera.position.z-ct.group.position.z;
+      for(const s of ct.sides){
+        const ft=(s.nx*tx+s.nz*tz)>0.15?0:1;
+        s.op+=(ft-s.op)*Math.min(1,dt*9);
+        const vis=s.op>0.03;
+        s.wall.visible=vis;s.rim.visible=vis;
+        if(vis){
+          const dw=s.op>0.6;
+          if(s.wallMat.depthWrite!==dw){s.wallMat.depthWrite=dw;s.rimMat.depthWrite=dw;}
+          s.wallMat.opacity=s.op;s.rimMat.opacity=s.op;
+        }
+        s.rimMat.emissiveIntensity=rimPulse;
       }
-      s.rimMat.emissiveIntensity=rimPulse;
-    }
 
-    const L=ct.stack.length,run=runLenBlocks(ct.stack);
-    const isSel=sel&&sel.ci===ct.index;
-    const needNow=sel?cubesOf(containers[sel.ci].stack.slice(sel.bi)):0;
-    const canDrop=sel&&!isSel&&cubesOf(ct.stack)+needNow<=CAP;
-    const ringT=isSel?.5+.28*Math.sin(t*5):Math.max(0,ct.winGlow-1)*.9;
-    ct.ring.material.opacity+=(ringT-ct.ring.material.opacity)*Math.min(1,dt*10);
-    const flashing=ct.badFlash>.04;
-    let dT=flashing?.6*ct.badFlash:(canDrop?.3+.22*Math.sin(t*5+ct.index):0);
-    ct.disc.material.color.setHex(flashing?0xff5566:0x41d6ff);
-    ct.disc.material.opacity+=(dT-ct.disc.material.opacity)*Math.min(1,dt*10);
+      const L=ct.stack.length,run=runLenBlocks(ct.stack);
+      const isSel=sel&&sel.ci===ct.index;
+      const needNow=sel?cubesOf(containers[sel.ci].stack.slice(sel.bi)):0;
+      const canDrop=sel&&!isSel&&cubesOf(ct.stack)+needNow<=CAP;
+      const ringT=isSel?.5+.28*Math.sin(t*5):Math.max(0,ct.winGlow-1)*.9;
+      ct.ring.material.opacity+=(ringT-ct.ring.material.opacity)*Math.min(1,dt*10);
+      const flashing=ct.badFlash>.04;
+      let dT=flashing?.6*ct.badFlash:(canDrop?.3+.22*Math.sin(t*5+ct.index):0);
+      ct.disc.material.color.setHex(flashing?0xff5566:0x41d6ff);
+      ct.disc.material.opacity+=(dT-ct.disc.material.opacity)*Math.min(1,dt*10);
 
-    /* stack blocks: y positions are cumulative heights (bars occupy n units) */
-    const selHere=sel&&sel.ci===ct.index;
-    let cum=0;
-    for(let i=0;i<L;i++){
-      const b=ct.stack[i],m=b.mesh,u=m.userData,n=b.n;
-      const ty=cum+n/2;cum+=n;
-      const inRun=i>=L-run;                          // in the top matching run (pickable)
-      const inSel=selHere&&i>=sel.bi;                // part of the lifted grab
-      let lift=0,sway=0;
-      if(inSel){lift=.55+Math.sin(t*5)*.05;sway=Math.sin(t*3.4)*.09;}  // whole grab moves in sync
-      let glow=inSel?.62:inRun?.26+Math.sin(t*2.6+u.phase)*.1:.1;
-      if(m===hoverMesh)glow=Math.max(glow,.72);
-      u.glow+=(glow-u.glow)*Math.min(1,dt*9);
-      m.material.emissiveIntensity=u.glow;
-      m.position.x+=-m.position.x*kk;
-      m.position.y+=(ty+lift-m.position.y)*kk;
-      m.position.z+=-m.position.z*kk;
-      m.rotation.y+=(sway-m.rotation.y)*Math.min(1,dt*8);
-      u.squash*=Math.exp(-dt*7);
-      const s=u.squash*.16;m.scale.set(1+s,(1-s)*n,1+s);   // squash respects the bar's n-height
+      /* stack blocks: y positions are cumulative heights (bars occupy n units) */
+      const selHere=sel&&sel.ci===ct.index;
+      let cum=0;
+      for(let i=0;i<L;i++){
+        const b=ct.stack[i],m=b.mesh,u=m.userData,n=b.n;
+        const ty=cum+n/2;cum+=n;
+        const inRun=i>=L-run;                          // in the top matching run (pickable)
+        const inSel=selHere&&i>=sel.bi;                // part of the lifted grab
+        let lift=0,sway=0;
+        if(inSel){lift=.55+Math.sin(t*5)*.05;sway=Math.sin(t*3.4)*.09;}  // whole grab moves in sync
+        let glow=inSel?.62:inRun?.26+Math.sin(t*2.6+u.phase)*.1:.1;
+        if(m===hoverMesh)glow=Math.max(glow,.72);
+        u.glow+=(glow-u.glow)*Math.min(1,dt*9);
+        m.material.emissiveIntensity=u.glow;
+        m.position.x+=-m.position.x*kk;
+        m.position.y+=(ty+lift-m.position.y)*kk;
+        m.position.z+=-m.position.z*kk;
+        m.rotation.y+=(sway-m.rotation.y)*Math.min(1,dt*8);
+        u.squash*=Math.exp(-dt*7);
+        const s=u.squash*.16;m.scale.set(1+s,(1-s)*n,1+s);   // squash respects the bar's n-height
+      }
     }
+    updParticles(dt);
+    timeEl.textContent=fmt(cur());
+    renderer.render(scene,camera);
+  }catch(err){
+    console.error(err);
+    showErr(err.message||String(err));
   }
-  updParticles(dt);
-  timeEl.textContent=fmt(cur());
-  renderer.render(scene,camera);
 }
 
 addEventListener('resize',()=>{
