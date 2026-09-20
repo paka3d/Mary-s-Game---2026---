@@ -641,6 +641,9 @@ function doMove(src,dst,bi){
       top.n+=b.n;
       top.mesh.geometry=cubeGeo(top.n);                  // stretch into a 1×1×n bar
       top.mesh.userData.squash=1;
+       let under=0;
+      for(const x of D.stack){ if(x===top)break; under+=x.n+GAP; }
+      top.mesh.position.y = under + GAP / 2 + top.n / 2;
       if(b.mesh.parent)b.mesh.parent.remove(b.mesh);
       b.mesh.material.dispose();
       const totalH=D.stack.reduce((a,x)=>a+x.n,0);
@@ -981,7 +984,7 @@ function tick(){
         m.position.z+=-m.position.z*kk;
         m.rotation.y+=(sway-m.rotation.y)*Math.min(1,dt*8);
         u.squash*=Math.exp(-dt*7);
-        const s=u.squash*.16;m.scale.set(1+s,(1-s)*n,1+s);   // squash respects the bar's n-height
+        const s=u.squash*.16;m.scale.set(1+s, 1-s, 1+s);   // squash respects the bar's n-height
       }
     }
     updParticles(dt);
