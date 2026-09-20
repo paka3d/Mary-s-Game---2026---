@@ -254,8 +254,12 @@ function showErr(msg){if(errbar){errbar.style.display='block';errbar.textContent
 window.addEventListener('error',e=>showErr(e.message||'runtime error'));
 window.addEventListener('unhandledrejection',e=>showErr((e.reason&&e.reason.message)||String(e.reason)));
 
-/* ================= constants ================= */
-const CAP=9, STAGES=50, MAXMERGE=4;
+/* ================= constants =================
+   GAP  = vertical spacing between stacked blocks — kills the coincident-face z-fight
+          at the contact plane between a merged bar and the cube below it.
+   CEIL = stack-top limit (inner wall top minus margin) — above this, top cubes break
+          off and scatter (see scatterOverflow). */
+const CAP=9, STAGES=50, MAXMERGE=4, GAP=0.06;
 const MERGE_PTS={2:50,3:150,4:500};
 const PAL=[0xff5c6c,0xffb52e,0x3fe08f,0x38c3ff,0xa06bff];
 const BASE_HINT='Tap a top cube to lift it · tap the bottom of a matching group to lift it all · matching cubes merge into 1×1×4 bars.';
@@ -315,6 +319,7 @@ const CUBE_G=new RoundedBoxGeometry(1,1,1,3,.085);
 const CUBEGS={1:CUBE_G};
 const cubeGeo=n=>CUBEGS[n]||(CUBEGS[n]=new RoundedBoxGeometry(1,n,1,3,.085));
 const INNER=1.28,WALLT=.16,WH=9.7,OUTER=INNER+WALLT*2,PX=INNER/2+WALLT/2;
+const CEIL=WALLT+WH-0.2;                 // stack-top overflow limit (just under the gold rim)
 const FLOOR_G=new THREE.BoxGeometry(OUTER,WALLT,OUTER);
 const WX_G=new THREE.BoxGeometry(WALLT,WH,OUTER);
 const WZ_G=new THREE.BoxGeometry(OUTER,WH,WALLT);
@@ -372,7 +377,7 @@ const sfx={
   drop(){this.tone(200,.09,'sine',.3,-80);this.tone(96,.14,'sine',.16,0,.01);},
   cancel(){this.tone(420,.07,'sine',.12,-160);},
   bad(){this.tone(130,.16,'sawtooth',.11,-45);},
-  /* merge pop — pitch & body scale with the resulting bar size; 4 adds a bell chime */
+  crack(){this.tone(190,.07,'square',.16,-70);this.tone(320,.06,'sine',.1,90,.02);},  // bar breaks off
   merge(n){
     const f=300+n*130;
     this.tone(f,.08,'sine',.3,150);
@@ -400,6 +405,8 @@ function makeBlock(color,n,y){
 function runLenBlocks(arr){if(!arr.length)return 0;const c=arr[arr.length-1].color;let n=1;
   for(let i=arr.length-2;i>=0&&arr[i].color===c;i--)n++;return n;}
 function cubesOf(arr){return arr.reduce((a,b)=>a+b.n,0);}
+/* total stacked height of a stack in world units, including the inter-block gaps */
+function stackH(arr){return cubesOf(arr)+GAP*Math.max(0,arr.length-1);}
 /* rebuild the raycast list so removed/merged meshes stop being pickable */
 function rebuildCubeList(){
   cubeList.length=0;
@@ -422,8 +429,7 @@ function solvedArr(st,ids,counts){
 }
 /* scramble FROM the solved state using legal group-grab moves — but WITHOUT merging:
    every block is always pushed as-is (n stays 1), so every stage starts as single cubes
-   and only PLAYER drops can create merges. (Scramble still stacks same-color cubes
-   adjacent, which is exactly what enables the group-lift mechanic at the start.) */
+   and only PLAYER drops can create merges. */
 function genStacks(st0,ids,counts,P){
   let best=null,bs=-1,last=null;
   for(let a=0;a<90;a++){
@@ -565,9 +571,7 @@ function newStage(s){
   });
   const total=Object.values(colorCounts).reduce((a,b)=>a+b,0);
   let boxes=P.boxes;if(total>=3*(boxes+1)&&Math.random()<.45)boxes++;   // random container count
-  /* st0 must have exactly `boxes` entries (one per CONTAINER), not one per color.
-     Extra containers start empty — the scrambler fills them, and the generation filter
-     still requires every container to end with 3+ cubes. */
+  /* st0 must have exactly `boxes` entries (one per CONTAINER), not one per color. */
   const st0=[];
   for(let i=0;i<boxes;i++)st0.push(i<solved.length?solved[i].map(b=>({color:b.color,n:b.n})):[]);
   const st=genStacks(st0,colorIds,colorCounts,P);
@@ -583,8 +587,8 @@ function newStage(s){
     const hb=new THREE.Mesh(HB_G,MAT.hb);hb.position.y=5.9;hb.userData.ci=i;g.add(hb);hitboxList.push(hb);
     let cum=0;
     st[i].forEach((sb,idx)=>{
-      const b=makeBlock(sb.color,sb.n,cum+sb.n/2+2.6+idx*.15+Math.random()*.8);  // drop-in from above
-      cum+=sb.n;
+      const b=makeBlock(sb.color,sb.n,cum+GAP/2+sb.n/2+2.6+idx*.15+Math.random()*.8);  // drop-in from above
+      cum+=sb.n+GAP;
       b.ci=i;
       g.add(b.mesh);ct.stack.push(b);cubeList.push(b.mesh);
     });
@@ -622,7 +626,7 @@ document.addEventListener('visibilitychange',()=>{
   else if(hiddenPause){tStart=performance.now();tRunning=true;hiddenPause=false;}
 });
 
-/* ================= moves / merges / win ================= */
+/* ================= moves / merges / overflow / win ================= */
 function doMove(src,dst,bi){
   const S=containers[src],D=containers[dst];
   const snapS=S.stack.map(b=>({color:b.color,n:b.n}));   // snapshots make undo merge-proof
@@ -649,11 +653,53 @@ function doMove(src,dst,bi){
       D.stack.push(b);
     }
   }
+  scatterOverflow(D);                                    // stack poked past the rim? break top cubes off
   rebuildCubeList();                                     // merged meshes leave the raycast list
   history.push({src,dst,snapS,snapD});
   sel=null;setHint(BASE_HINT);
   sfx.drop();
   checkWin();
+}
+/* if the destination stack rises above the rim (CEIL), the top cubes break off ONE AT A
+   TIME — a merged bar loses one cube (and shrinks) if it's the part sticking out — and each
+   broken-off cube flies out and re-lands as a SINGLE cube in a random other container. */
+function scatterOverflow(D){
+  let guard=10;
+  while(stackH(D.stack)>CEIL&&guard--){
+    const top=D.stack[D.stack.length-1];
+    if(!top)break;
+    const color=top.color;
+    let blk;
+    if(top.n>1){
+      top.n-=1;                                          // split one cube off the merged bar
+      top.mesh.geometry=cubeGeo(top.n);
+      top.mesh.userData.squash=1;
+      blk=makeBlock(color,1,0);                          // fresh single cube for the scatter
+    }else{
+      blk={color,n:1,mesh:top.mesh,ci:-1};               // reuse the popped single's mesh
+      D.stack.pop();
+      D.group.remove(blk.mesh);
+      blk.mesh.userData.item=blk;
+    }
+    const targets=containers.filter(c=>c!==D&&cubesOf(c.stack)+1<=CAP);
+    if(!targets.length){                                 // rare: nowhere has room → sit back on top
+      D.group.add(blk.mesh);
+      blk.ci=D.index;
+      blk.mesh.position.set(0,stackH(D.stack)+GAP/2+0.6,0);
+      D.stack.push(blk);
+      break;
+    }
+    const T=targets[(Math.random()*targets.length)|0];
+    blk.ci=T.index;
+    T.group.add(blk.mesh);
+    /* launch from just above D's new top, land (via lerp) into the random container */
+    const sy=stackH(D.stack)+GAP/2+1.8;
+    blk.mesh.position.set(D.basePos.x-T.basePos.x,sy,D.basePos.z-T.basePos.z);
+    blk.mesh.userData.squash=1;
+    T.stack.push(blk);
+    burst(new THREE.Vector3(D.basePos.x,stackH(D.stack)+.4,D.basePos.z),color,10,1.2,2.4);
+    sfx.crack();
+  }
 }
 function undoMove(){
   if(state!=='play')return;
@@ -670,9 +716,9 @@ function restoreStack(ct,snap){
   ct.stack.length=0;
   let cum=0;
   for(const s of snap){
-    const b=makeBlock(s.color,s.n,cum+s.n/2);
+    const b=makeBlock(s.color,s.n,cum+GAP/2+s.n/2);
     b.ci=ct.index;
-    ct.group.add(b.mesh);ct.stack.push(b);cum+=s.n;
+    ct.group.add(b.mesh);ct.stack.push(b);cum+=s.n+GAP;
   }
 }
 function checkWin(){
@@ -916,12 +962,12 @@ function tick(){
       ct.disc.material.color.setHex(flashing?0xff5566:0x41d6ff);
       ct.disc.material.opacity+=(dT-ct.disc.material.opacity)*Math.min(1,dt*10);
 
-      /* stack blocks: y positions are cumulative heights (bars occupy n units) */
+      /* stack blocks: y positions are cumulative heights with a small GAP between blocks */
       const selHere=sel&&sel.ci===ct.index;
       let cum=0;
       for(let i=0;i<L;i++){
         const b=ct.stack[i],m=b.mesh,u=m.userData,n=b.n;
-        const ty=cum+n/2;cum+=n;
+        const ty=cum+GAP/2+n/2;cum+=n+GAP;
         const inRun=i>=L-run;                          // in the top matching run (pickable)
         const inSel=selHere&&i>=sel.bi;                // part of the lifted grab
         let lift=0,sway=0;
